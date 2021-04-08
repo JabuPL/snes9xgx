@@ -1,6 +1,6 @@
 # Snes9x GX - DS3 Mod #
-This mod let's you play your SNES/SFC games with a wired Dualshock3 Controller.
-It works only in-game for now, you still need a Wiimote/GC Controller to navigate the emulators menus.
+This mod let's you play your SNES/SFC games with a wired Dualshock3 Controller.\
+It works only in-game for now, you still need a Wiimote/GC Controller to navigate the emulators menus.\
 Only one connected DS3 Controller will work. 
 
 How to use:
@@ -9,6 +9,10 @@ How to use:
 3. It should connect, one led on the controller should light up
 4. Start a game with your Wiimote/GC Controller/etc
 5. Done, you can play now on a DS3 Controller
+
+Known issues:\
+Emulator will crash if you connect a DS3 while playing a game.\
+Make sure you connect it before launching a game and it should work fine.
 
 Button Mappings:
 | **Dualshock 3**   | **SNES Controller** |
