@@ -9,6 +9,12 @@
  * input.cpp
  *
  * Wii/Gamecube controller management
+ *
+ * Wired DS3 Support added by Jabu
+ * using the older version of libsicksaxis by xerpi
+ * (cuz I couldn't get the latest version to work)
+ * Based on code borrowed from https://github.com/niuus/Snes9xRX
+ * TODO: fix crash when connecting DS3 while game running!
  ***************************************************************************/
 
 #include <gccore.h>
@@ -43,6 +49,17 @@
 #endif
 
 #define ANALOG_SENSITIVITY 30
+
+//DS3
+#ifdef HW_RVL
+ extern "C"{
+#include "sicksaxis.h"
+}
+static ss_instance_t sicksaxis;
+int ds3chan = 0;
+#define SICKSAXIS_DEADZONE 115				  
+#endif
+//
 
 int rumbleRequest[4] = {0,0,0,0};
 int playerMapping[4] = {0,1,2,3};
@@ -346,6 +363,27 @@ UpdatePads()
 	#endif
 
 	PAD_ScanPads();
+	
+	//DS3
+	#ifdef HW_RVL
+	u16 buttonsHeld = WPAD_ButtonsHeld(0);
+	if(sicksaxis.connected)
+	{
+		if(buttonsHeld & WPAD_BUTTON_1  && buttonsHeld & WPAD_BUTTON_2)
+		{
+			ss_close(&sicksaxis);
+		}
+	}
+	else
+	{
+		if(ss_open(&sicksaxis) > 0)
+		{
+			ss_set_led(&sicksaxis, 1);
+			ss_start_reading(&sicksaxis);
+		}
+	}
+	#endif	
+	//	
 
 	for(int i=3; i >= 0; i--)
 	{
@@ -385,7 +423,14 @@ SetupPads()
 {
 	soundSync = Settings.SoundSync;
 	PAD_Init();
-
+	
+	//DS3
+	#ifdef HW_RVL
+	ss_init();
+	if(ss_open(&sicksaxis) > 0) ss_start_reading(&sicksaxis);
+	#endif
+	//
+	
 	#ifdef HW_RVL
 	// read wiimote accelerometer and IR data
 	WPAD_SetDataFormat(WPAD_CHAN_ALL,WPAD_FMT_BTNS_ACC_IR);
@@ -547,6 +592,56 @@ static void decodepad (int chan, int emuChan)
 	jp |= Hornet_ButtonsHeld(chan);
 	jp |= Mayflash_ButtonsHeld(chan);
 #endif
+
+	//DS3
+	#ifdef HW_RVL
+	if(sicksaxis.connected)
+	{
+		//zmiana portu SNES
+		if(sicksaxis.gamepad.buttons.PS &&  sicksaxis.gamepad.buttons.R1 && sicksaxis.gamepad.buttons.triangle) ds3chan = 0;
+		if(sicksaxis.gamepad.buttons.PS &&  sicksaxis.gamepad.buttons.R1 && sicksaxis.gamepad.buttons.circle) ds3chan = 1;
+		if(sicksaxis.gamepad.buttons.PS &&  sicksaxis.gamepad.buttons.R1 && sicksaxis.gamepad.buttons.cross) ds3chan = 2;
+		if(sicksaxis.gamepad.buttons.PS &&  sicksaxis.gamepad.buttons.R1 && sicksaxis.gamepad.buttons.square) ds3chan = 3;
+		
+		//Obrot facebuttons
+		
+		if(chan == ds3chan){
+			int8_t alX = sicksaxis.gamepad.leftAnalog.x - 128;
+			int8_t alY = sicksaxis.gamepad.leftAnalog.y - 128;
+			
+			int8_t arX = sicksaxis.gamepad.rightAnalog.x - 128;
+			int8_t arY = sicksaxis.gamepad.rightAnalog.y - 128;
+			
+			uint8_t up    = sicksaxis.gamepad.buttons.up    ||  (alY < -SICKSAXIS_DEADZONE);
+			uint8_t down  = sicksaxis.gamepad.buttons.down  ||  (alY > SICKSAXIS_DEADZONE);
+			uint8_t right = sicksaxis.gamepad.buttons.right ||  (alX > SICKSAXIS_DEADZONE);
+			uint8_t left  = sicksaxis.gamepad.buttons.left  ||  (alX < -SICKSAXIS_DEADZONE);
+			
+			uint8_t triangle    = sicksaxis.gamepad.buttons.triangle	||  (arY < -SICKSAXIS_DEADZONE);
+			uint8_t cross  = sicksaxis.gamepad.buttons.cross  			||  (arY > SICKSAXIS_DEADZONE);
+			uint8_t circle = sicksaxis.gamepad.buttons.circle 			||  (arX > SICKSAXIS_DEADZONE);
+			uint8_t square  = sicksaxis.gamepad.buttons.square  		||  (arX < -SICKSAXIS_DEADZONE);
+
+			jp |= up    ? PAD_BUTTON_UP    : 0;
+			jp |= down  ? PAD_BUTTON_DOWN  : 0;
+			jp |= right ? PAD_BUTTON_RIGHT : 0;
+			jp |= left  ? PAD_BUTTON_LEFT  : 0;
+
+			jp |= circle   ? PAD_BUTTON_A : 0;
+			jp |= cross    ? PAD_BUTTON_B : 0;
+			jp |= triangle ? PAD_BUTTON_X : 0;
+			jp |= square   ? PAD_BUTTON_Y : 0;
+
+			jp |= sicksaxis.gamepad.buttons.L1 ? PAD_TRIGGER_L : 0;
+			jp |= sicksaxis.gamepad.buttons.R1 ? PAD_TRIGGER_R : 0;
+
+			jp |= sicksaxis.gamepad.buttons.select ? PAD_TRIGGER_Z : 0;
+			jp |= sicksaxis.gamepad.buttons.start ? PAD_BUTTON_START : 0;
+
+		}
+	}
+	#endif
+	//
 
 	/***
 	Gamecube Joystick input
